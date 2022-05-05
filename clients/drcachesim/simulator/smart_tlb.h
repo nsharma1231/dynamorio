@@ -45,6 +45,7 @@ protected:
     int
     replace_which_way(int block_idx) override;
 
+    int psel : 10;
 };
 
 #define DISTANT_RRPV    3

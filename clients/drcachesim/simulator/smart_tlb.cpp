@@ -33,6 +33,25 @@
 #include "smart_tlb.h"
 #include "../common/utils.h"
 #include <assert.h>
+#include <stdlib.h>
+
+#define compute_set(b) ((b) >> assoc_bits_)
+
+static inline bool
+is_srrip_leader(int set)
+{
+    int offset = set & 0x1f;
+    int constituency = (set >> 5) & 0x1f;
+    return offset == constituency;
+}
+
+static inline bool
+is_brrip_leader(int set)
+{
+    int offset = (~set) & 0x1f;
+    int constituency = (set >> 5) & 0x1f;
+    return offset == constituency;
+}
 
 void
 smart_tlb_t::access_update(int block_idx, int way)
@@ -72,7 +91,34 @@ caching_device_t::replace_which_way(int block_idx)
         block.counter_ += (DISTANT_RRPV - max_rrpv);
     }
 
-    // set a _distant_ rrpv value for incoming way
-    get_caching_device_block(block_idx, min_way).counter_ = LONG_RRPV;
+
+    int set = compute_set(block_idx);
+
+    bool srrip = is_srrip_leader(set);
+    bool brrip = is_brrip_leader(set);
+
+    assert(!(srrip && brrip));
+
+    // update psel
+    if (brrip && (psel != 0x1FF)) psel++;
+    if (srrip && (psel != 0x200)) psel--;
+
+    bool leader = srrip || brrip;
+    bool follower = !leader;
+    int psel_msb = (psel >> 9) & 0b1;
+
+    // brrip insertion policy
+    if ((leader && brrip) || (follower && psel_msb)) {
+        int val = rand() % 32;
+        get_caching_device_block(block_idx, min_way).counter_ = val ? DISTANT_RRPV : LONG_RRPV;
+    }
+
+    // srrip insertion policy
+    if ((leader && srrip) || (follower && !psel_msb)) {
+        // set a _distant_ rrpv value for incoming way
+        get_caching_device_block(block_idx, min_way).counter_ = DISTANT_RRPV;
+    }
+
+    // return line to replace
     return max_way;
 }
