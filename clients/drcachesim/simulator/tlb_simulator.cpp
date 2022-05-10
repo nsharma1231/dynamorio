@@ -42,6 +42,7 @@
 #include "droption.h"
 #include "tlb_stats.h"
 #include "tlb.h"
+#include "smart_tlb.h"
 #include "tlb_simulator.h"
 
 analysis_tool_t *
@@ -77,7 +78,7 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
             success_ = false;
             return;
         }
-        lltlbs_[i] = create_tlb(knobs_.TLB_replace_policy);
+        lltlbs_[i] = new smart_tlb_t;
         if (lltlbs_[i] == NULL) {
             error_string_ = "Failed to create lltlbs_";
             success_ = false;
