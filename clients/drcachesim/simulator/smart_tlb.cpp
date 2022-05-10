@@ -56,13 +56,20 @@ is_brrip_leader(int set)
 void
 smart_tlb_t::access_update(int block_idx, int way)
 {
-    // set RRPV to 0
-    get_caching_device_block(block_idx, way).counter_ = NEAR_IMM_RRPV;
+    if (!_miss) {
+        // set RRPV to 0
+        get_caching_device_block(block_idx, way).counter_ = NEARIMM_RRPV;
+        return;
+    }
+
+    _miss = false;
 }
 
 int
-caching_device_t::replace_which_way(int block_idx)
+smart_tlb_t::replace_which_way(int block_idx)
 {
+    _miss = true;
+
     // The base caching device class only implements LFU.
     // A subclass can override this and access_update() to implement
     // some other scheme.
@@ -74,7 +81,7 @@ caching_device_t::replace_which_way(int block_idx)
         // extra space is available, use it
         if (block.tag_ == TAG_INVALID) {
             // set a _distant_ rrpv value for incoming way
-            get_caching_device_block(block_idx, min_way).counter_ = LONG_RRPV;
+            get_caching_device_block(block_idx, max_way).counter_ = LONG_RRPV;
             return max_way;
         }
         
@@ -99,24 +106,24 @@ caching_device_t::replace_which_way(int block_idx)
 
     assert(!(srrip && brrip));
 
-    // update psel
-    if (brrip && (psel != 0x1FF)) psel++;
-    if (srrip && (psel != 0x200)) psel--;
+    // update _psel
+    if (brrip && (_psel != 0x1FF)) _psel++;
+    if (srrip && (_psel != 0x200)) _psel--;
 
     bool leader = srrip || brrip;
     bool follower = !leader;
-    int psel_msb = (psel >> 9) & 0b1;
+    int psel_msb = (_psel >> 9) & 0b1;
 
     // brrip insertion policy
     if ((leader && brrip) || (follower && psel_msb)) {
         int val = rand() % 32;
-        get_caching_device_block(block_idx, min_way).counter_ = val ? DISTANT_RRPV : LONG_RRPV;
+        get_caching_device_block(block_idx, max_way).counter_ = val ? DISTANT_RRPV : LONG_RRPV;
     }
 
     // srrip insertion policy
     if ((leader && srrip) || (follower && !psel_msb)) {
         // set a _distant_ rrpv value for incoming way
-        get_caching_device_block(block_idx, min_way).counter_ = DISTANT_RRPV;
+        get_caching_device_block(block_idx, max_way).counter_ = DISTANT_RRPV;
     }
 
     // return line to replace

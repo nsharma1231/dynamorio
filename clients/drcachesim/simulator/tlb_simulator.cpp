@@ -67,12 +67,14 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
     }
     for (unsigned int i = 0; i < knobs_.num_cores; i++) {
         itlbs_[i] = create_tlb(knobs_.TLB_replace_policy);
+        itlbs_[i]->set_core(i);
         if (itlbs_[i] == NULL) {
             error_string_ = "Failed to create itlbs_";
             success_ = false;
             return;
         }
         dtlbs_[i] = create_tlb(knobs_.TLB_replace_policy);
+        dtlbs_[i]->set_core(i);
         if (dtlbs_[i] == NULL) {
             error_string_ = "Failed to create dtlbs_";
             success_ = false;
@@ -80,6 +82,7 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
         }
         // use drrip for LL TLB
         lltlbs_[i] = new smart_tlb_t;
+        lltlbs_[i]->set_core(i);
         if (lltlbs_[i] == NULL) {
             error_string_ = "Failed to create lltlbs_";
             success_ = false;

@@ -45,11 +45,12 @@ protected:
     int
     replace_which_way(int block_idx) override;
 
-    int psel : 10;
+    int _psel : 10;
+    bool _miss = false;
 };
 
 #define DISTANT_RRPV    3
 #define LONG_RRPV       2
-#define NEAR_IMM_RRPV   0
+#define NEARIMM_RRPV    0
 
 #endif /* _SMART_TLB_H_ */

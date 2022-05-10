@@ -44,6 +44,11 @@ class tlb_t : public caching_device_t {
 public:
     void
     request(const memref_t &memref) override;
+    void
+    set_core(unsigned int _core_id)
+    {
+        core_id = _core_id;
+    }
 
     // TODO i#4816: The addition of the pid as a lookup parameter beyond just the tag
     // needs to be imposed on the parent methods invalidate(), contains_tag(), and
@@ -55,6 +60,7 @@ protected:
 
     // Optimization: remember last pid in addition to last tag
     memref_pid_t last_pid_;
+    unsigned int core_id;
 };
 
 #endif /* _TLB_H_ */
