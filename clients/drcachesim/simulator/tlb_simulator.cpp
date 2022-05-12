@@ -42,7 +42,6 @@
 #include "droption.h"
 #include "tlb_stats.h"
 #include "tlb.h"
-#include "smart_tlb.h"
 #include "tlb_simulator.h"
 
 analysis_tool_t *
@@ -59,7 +58,7 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
 {
     itlbs_ = new tlb_t *[knobs_.num_cores];
     dtlbs_ = new tlb_t *[knobs_.num_cores];
-    lltlb_ = new smart_tlb_t;
+    lltlb_ = create_tlb(knobs_.TLB_replace_policy);
 	if(!lltlb_->init(knobs_.TLB_L2_assoc, (int)knobs_.page_size,
 						  knobs_.TLB_L2_entries, NULL,
 						  new tlb_stats_t((int)knobs_.page_size))) {
