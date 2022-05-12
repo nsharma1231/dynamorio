@@ -34,43 +34,59 @@
 #include "../common/utils.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <iostream>
+#include <unordered_set>
+
+#ifdef MYDEBUG
+#define HERE(str)  \
+    std::cout << "[LOG] reached code location " << __FILE__ << ":" << __LINE__  << " (" << str << ")\n"
+#else
+#define HERE(str)
+#endif
 
 void
 smart_tlb_t::access_update(int block_idx, int _way)
 {
+    HERE("entered access_update");
+#ifdef MYDEBUG
+    if (_way < 0 || _way >= associativity_)
+        std::cout << "[LOG] _way is out of bounds" << std::endl;
+#endif
+
     // old LRU stack position
-    int old = get_caching_device_block(block_idx, _way).counter_;
+    int old = _miss ? associativity_ : get_caching_device_block(block_idx, _way).counter_;
     get_caching_device_block(block_idx, _way).counter_ = MRU;
 
     for (int way = 0; way < associativity_; ++way) {
         if (way == _way) continue;
 
         auto block = get_caching_device_block(block_idx, way);
+        if (block.tag_ == TAG_INVALID) continue;
+        
         if (block.counter_ < old) block.counter_++;
     }
 
     _miss = false;
+    HERE("exiting access_update");
 }
 
-int
-smart_tlb_t::replace_which_way(int block_idx)
-{
-    _miss = true;
 
-    // check if the current set is not yet full
+int
+smart_tlb_t::replace_which_way(int line_idx)
+{
+    // We implement LRU by picking the slot with the largest counter value.
+    // because i hate life
+    int max_counter = 0;
+    int max_way = 0;
     for (int way = 0; way < associativity_; ++way) {
-        if (get_caching_device_block(block_idx, way).tag_ == TAG_INVALID) {
-            return way;
+        if (get_caching_device_block(line_idx, way).tag_ == TAG_INVALID) {
+            max_way = way;
+            break;
+        }
+        if (get_caching_device_block(line_idx, way).counter_ > max_counter) {
+            max_counter = get_caching_device_block(line_idx, way).counter_;
+            max_way = way;
         }
     }
-
-    for (int way = 0; way < associativity_; ++way) {
-        // find the LRU block
-        if (get_caching_device_block(block_idx, way).counter_ == LRU)
-            return way;
-    }
-
-    // should never get here
-    assert(false);
-    return -1;
+    return max_way;
 }
