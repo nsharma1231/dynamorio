@@ -42,6 +42,7 @@
 #include "droption.h"
 #include "tlb_stats.h"
 #include "tlb.h"
+#include "smart_tlb.h"
 #include "tlb_simulator.h"
 
 analysis_tool_t *
@@ -58,11 +59,20 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
 {
     itlbs_ = new tlb_t *[knobs_.num_cores];
     dtlbs_ = new tlb_t *[knobs_.num_cores];
-    lltlbs_ = new tlb_t *[knobs_.num_cores];
+    lltlb_ = new smart_tlb_t;
+	if(!lltlb_->init(knobs_.TLB_L2_assoc, (int)knobs_.page_size,
+						  knobs_.TLB_L2_entries, NULL,
+						  new tlb_stats_t((int)knobs_.page_size))) {
+		error_string_ =
+			"Usage error: failed to initialize TLbs_. Ensure entry number, "
+			"page size and associativity are powers of 2.";
+		success_ = false;
+		return;
+	}
+
     for (unsigned int i = 0; i < knobs_.num_cores; i++) {
         itlbs_[i] = NULL;
         dtlbs_[i] = NULL;
-        lltlbs_[i] = NULL;
     }
     for (unsigned int i = 0; i < knobs_.num_cores; i++) {
         itlbs_[i] = create_tlb(knobs_.TLB_replace_policy);
@@ -77,22 +87,13 @@ tlb_simulator_t::tlb_simulator_t(const tlb_simulator_knobs_t &knobs)
             success_ = false;
             return;
         }
-        lltlbs_[i] = create_tlb(knobs_.TLB_replace_policy);
-        if (lltlbs_[i] == NULL) {
-            error_string_ = "Failed to create lltlbs_";
-            success_ = false;
-            return;
-        }
 
         if (!itlbs_[i]->init(knobs_.TLB_L1I_assoc, (int)knobs_.page_size,
-                             knobs_.TLB_L1I_entries, lltlbs_[i],
+                             knobs_.TLB_L1I_entries, lltlb_,
                              new tlb_stats_t((int)knobs_.page_size)) ||
             !dtlbs_[i]->init(knobs_.TLB_L1D_assoc, (int)knobs_.page_size,
-                             knobs_.TLB_L1D_entries, lltlbs_[i],
-                             new tlb_stats_t((int)knobs_.page_size)) ||
-            !lltlbs_[i]->init(knobs_.TLB_L2_assoc, (int)knobs_.page_size,
-                              knobs_.TLB_L2_entries, NULL,
-                              new tlb_stats_t((int)knobs_.page_size))) {
+                             knobs_.TLB_L1D_entries, lltlb_,
+                             new tlb_stats_t((int)knobs_.page_size))) {
             error_string_ =
                 "Usage error: failed to initialize TLbs_. Ensure entry number, "
                 "page size and associativity are powers of 2.";
@@ -114,14 +115,11 @@ tlb_simulator_t::~tlb_simulator_t()
             return;
         delete dtlbs_[i]->get_stats();
         delete dtlbs_[i];
-        if (lltlbs_[i] == NULL)
-            return;
-        delete lltlbs_[i]->get_stats();
-        delete lltlbs_[i];
     }
     delete[] itlbs_;
     delete[] dtlbs_;
-    delete[] lltlbs_;
+    delete lltlb_->get_stats();
+	delete lltlb_;
 }
 
 bool
@@ -192,8 +190,8 @@ tlb_simulator_t::process_memref(const memref_t &memref)
             for (unsigned int i = 0; i < knobs_.num_cores; i++) {
                 itlbs_[i]->get_stats()->reset();
                 dtlbs_[i]->get_stats()->reset();
-                lltlbs_[i]->get_stats()->reset();
             }
+            lltlb_->get_stats()->reset();
         }
     } else {
         knobs_.sim_refs--;
@@ -212,10 +210,10 @@ tlb_simulator_t::print_results()
             itlbs_[i]->get_stats()->print_stats("    ");
             std::cerr << "  L1D stats:" << std::endl;
             dtlbs_[i]->get_stats()->print_stats("    ");
-            std::cerr << "  LL stats:" << std::endl;
-            lltlbs_[i]->get_stats()->print_stats("    ");
         }
     }
+    std::cerr << "  LL stats:" << std::endl;
+	lltlb_->get_stats()->print_stats("    ");
     return true;
 }
 

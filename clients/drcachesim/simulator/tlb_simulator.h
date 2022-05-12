@@ -62,7 +62,7 @@ protected:
     // All of them are private to the core.
     tlb_t **itlbs_;
     tlb_t **dtlbs_;
-    tlb_t **lltlbs_;
+    tlb_t *lltlb_;
 };
 
 #endif /* _TLB_SIMULATOR_H_ */
