@@ -82,7 +82,7 @@ smart_tlb_t::replace_which_way(int block_idx)
         if (block.tag_ == TAG_INVALID) {
             // set a _distant_ rrpv value for incoming way
             get_caching_device_block(block_idx, max_way).counter_ = LONG_RRPV;
-            return max_way;
+            return way;
         }
         
         // find left-most cache block with max RRPV value
