@@ -34,34 +34,15 @@
 #include "../common/utils.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <time.h>
 
-#define compute_set(b) ((b) >> assoc_bits_)
-
-static inline bool
-is_srrip_leader(int set)
-{
-    int offset = set & 0x1f;
-    int constituency = (set >> 5) & 0x1f;
-    return offset == constituency;
-}
-
-static inline bool
-is_brrip_leader(int set)
-{
-    int offset = (~set) & 0x1f;
-    int constituency = (set >> 5) & 0x1f;
-    return offset == constituency;
+smart_tlb_t::smart_tlb_t() {
+    srand(time(NULL));
 }
 
 void
 smart_tlb_t::access_update(int block_idx, int way)
 {
-    if (!_miss) {
-        // set RRPV to 0
-        get_caching_device_block(block_idx, way).counter_ = NEARIMM_RRPV;
-        return;
-    }
-
     _miss = false;
 }
 
@@ -70,62 +51,9 @@ smart_tlb_t::replace_which_way(int block_idx)
 {
     _miss = true;
 
-    // The base caching device class only implements LFU.
-    // A subclass can override this and access_update() to implement
-    // some other scheme.
-    int max_way = 0;
-    int max_rrpv = 0;
-    for (int way = 0; way < associativity_; ++way) {
-        auto block = get_caching_device_block(block_idx, way);
-
-        // extra space is available, use it
-        if (block.tag_ == TAG_INVALID) {
-            // set a _distant_ rrpv value for incoming way
-            get_caching_device_block(block_idx, max_way).counter_ = LONG_RRPV;
+    for (int way = 0; way < associativity_; ++way)
+        if (get_caching_device_block(block_idx, way).tag_ == TAG_INVALID)
             return way;
-        }
-        
-        // find left-most cache block with max RRPV value
-        else if (block.counter_ > max_rrpv) {
-            max_rrpv = block.counter_;
-            max_way = way;
-        }
-    }
 
-    // update RRPV values
-    for (int way = 0; way < associativity_; ++way) {
-        auto block = get_caching_device_block(block_idx, way);
-        block.counter_ += (DISTANT_RRPV - max_rrpv);
-    }
-
-
-    int set = compute_set(block_idx);
-
-    bool srrip = is_srrip_leader(set);
-    bool brrip = is_brrip_leader(set);
-
-    assert(!(srrip && brrip));
-
-    // update _psel
-    if (brrip && (_psel != 0x1FF)) _psel++;
-    if (srrip && (_psel != 0x200)) _psel--;
-
-    bool leader = srrip || brrip;
-    bool follower = !leader;
-    int psel_msb = (_psel >> 9) & 0b1;
-
-    // brrip insertion policy
-    if ((leader && brrip) || (follower && psel_msb)) {
-        int val = rand() % 32;
-        get_caching_device_block(block_idx, max_way).counter_ = val ? DISTANT_RRPV : LONG_RRPV;
-    }
-
-    // srrip insertion policy
-    if ((leader && srrip) || (follower && !psel_msb)) {
-        // set a _distant_ rrpv value for incoming way
-        get_caching_device_block(block_idx, max_way).counter_ = DISTANT_RRPV;
-    }
-
-    // return line to replace
-    return max_way;
+    return rand() % associativity_;
 }
