@@ -47,6 +47,8 @@ protected:
 
     int _psel : 10;
     bool _miss = false;
+public:
+    smart_tlb_t();
 };
 
 #define DISTANT_RRPV    3
